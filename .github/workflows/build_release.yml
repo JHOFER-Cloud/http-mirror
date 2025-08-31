@@ -39,14 +39,28 @@ jobs:
           go mod tidy
           git diff --exit-code go.mod go.sum
 
-  build-server:
-    name: Build Server Image
-    #TODO: seperate matrix for arm and amd for faster builds?
+  build:
+    name: Build ${{ matrix.image }}
     runs-on: ubuntu-latest
     needs: test
+    strategy:
+      matrix:
+        include:
+          - image: server
+            dockerfile: ./Dockerfile.server
+            name: ghcr.io/jhofer-cloud/http-mirror-server
+            title: HTTP Mirror Server
+            description: Web server component for HTTP Mirror
+          - image: updater
+            dockerfile: ./Dockerfile.updater
+            name: ghcr.io/jhofer-cloud/http-mirror-updater
+            title: HTTP Mirror Updater
+            description: Updater component for HTTP Mirror
     outputs:
-      digest: ${{ steps.build.outputs.digest }}
-      image: ${{ env.SERVER_IMAGE_NAME }}
+      server-digest: ${{ matrix.image == 'server' && steps.build.outputs.digest || '' }}
+      updater-digest: ${{ matrix.image == 'updater' && steps.build.outputs.digest || '' }}
+      server-image: ${{ env.SERVER_IMAGE_NAME }}
+      updater-image: ${{ env.UPDATER_IMAGE_NAME }}
     permissions:
       contents: read
       packages: write
@@ -74,7 +88,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.SERVER_IMAGE_NAME }}
+          images: ${{ matrix.name }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -83,85 +97,30 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
             type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
           labels: |
-            org.opencontainers.image.title=HTTP Mirror Server
-            org.opencontainers.image.description=Web server component for HTTP Mirror
+            org.opencontainers.image.title=${{ matrix.title }}
+            org.opencontainers.image.description=${{ matrix.description }}
 
       - name: Build and push
         id: build
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile.server
-          platforms: linux/amd64,linux/arm64
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  build-updater:
-    name: Build Updater Image
-    runs-on: ubuntu-latest
-    needs: test
-    outputs:
-      digest: ${{ steps.build.outputs.digest }}
-      image: ${{ env.UPDATER_IMAGE_NAME }}
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Container Registry
-        if: github.event_name != 'pull_request'
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract version (for releases)
-        id: version
-        if: startsWith(github.ref, 'refs/tags/v')
-        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
-
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.UPDATER_IMAGE_NAME }}
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=sha,prefix={{branch}}-,enable=${{ github.event_name != 'pull_request' }}
-            type=semver,pattern={{version}},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
-          labels: |
-            org.opencontainers.image.title=HTTP Mirror Updater
-            org.opencontainers.image.description=Updater component for HTTP Mirror
-
-      - name: Build and push
-        id: build
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./Dockerfile.updater
-          platforms: linux/amd64,linux/arm64
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: |
+            type=gha,scope=${{ matrix.image }}
+            type=gha,scope=go-deps
+          cache-to: |
+            type=gha,mode=max,scope=${{ matrix.image }}
+            type=gha,mode=max,scope=go-deps
 
   security-scan:
     name: Security Scan
     runs-on: ubuntu-latest
-    needs: [build-server, build-updater]
+    needs: [build]
     if: github.event_name != 'pull_request'
     permissions:
       actions: read
@@ -173,14 +132,14 @@ jobs:
       - name: Run Trivy vulnerability scanner (Server)
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ needs.build-server.outputs.image }}@${{ needs.build-server.outputs.digest }}
+          image-ref: ${{ needs.build.outputs.server-image }}@${{ needs.build.outputs.server-digest }}
           format: "sarif"
           output: "trivy-server-results.sarif"
 
       - name: Run Trivy vulnerability scanner (Updater)
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ needs.build-updater.outputs.image }}@${{ needs.build-updater.outputs.digest }}
+          image-ref: ${{ needs.build.outputs.updater-image }}@${{ needs.build.outputs.updater-digest }}
           format: "sarif"
           output: "trivy-updater-results.sarif"
 
@@ -201,7 +160,7 @@ jobs:
   release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: [build-server, build-updater, security-scan]
+    needs: [build, security-scan]
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
