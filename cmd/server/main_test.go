@@ -155,3 +155,40 @@ func TestGetDirStatsNonExistentDir(t *testing.T) {
 		t.Error("Stats map should not be nil even on error")
 	}
 }
+
+func TestSecurityHeaders(t *testing.T) {
+	// Create a simple handler
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("test"))
+	})
+	
+	// Wrap with security middleware
+	secureHandler := securityHeadersMiddleware(handler)
+	
+	req := httptest.NewRequest("GET", "/", nil)
+	w := httptest.NewRecorder()
+	
+	secureHandler.ServeHTTP(w, req)
+	
+	resp := w.Result()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", resp.StatusCode)
+	}
+	
+	// Check security headers
+	expectedHeaders := map[string]string{
+		"Content-Security-Policy": "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; object-src 'none';",
+		"X-Frame-Options":         "DENY",
+		"X-Content-Type-Options":  "nosniff",
+		"Referrer-Policy":         "strict-origin-when-cross-origin",
+		"X-XSS-Protection":        "1; mode=block",
+	}
+	
+	for header, expected := range expectedHeaders {
+		actual := resp.Header.Get(header)
+		if actual != expected {
+			t.Errorf("Expected %s header to be '%s', got '%s'", header, expected, actual)
+		}
+	}
+}

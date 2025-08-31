@@ -94,6 +94,9 @@ func main() {
 	// Prometheus metrics endpoint
 	mux.Handle("/metrics", promhttp.Handler())
 
+	// Wrap with security headers middleware
+	handler := securityHeadersMiddleware(mux)
+
 	// Initialize metrics immediately
 	updateMetrics(cfg, logger)
 	
@@ -102,7 +105,7 @@ func main() {
 
 	server := &http.Server{
 		Addr:    fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),
-		Handler: mux,
+		Handler: handler,
 		
 		// Security settings
 		ReadTimeout:       10 * time.Second,
@@ -247,4 +250,24 @@ func getDirStats(dirPath string) (map[string]interface{}, error) {
 	stats["total_size_bytes"] = totalSize
 	
 	return stats, nil
+}
+
+// securityHeadersMiddleware adds security headers to all responses
+func securityHeadersMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Content Security Policy
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; object-src 'none';")
+		
+		// X-Frame-Options to prevent clickjacking
+		w.Header().Set("X-Frame-Options", "DENY")
+		
+		// X-Content-Type-Options to prevent MIME type sniffing
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		
+		// Other security headers
+		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		w.Header().Set("X-XSS-Protection", "1; mode=block")
+		
+		next.ServeHTTP(w, r)
+	})
 }
