@@ -12,11 +12,43 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/jhofer-cloud/http-mirror/pkg/config"
 	"github.com/jhofer-cloud/http-mirror/pkg/files"
 )
 
+var (
+	// Metrics for the mirror server
+	mirrorFilesTotal = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "http_mirror_files_total",
+			Help: "Total number of mirrored files",
+		},
+		[]string{"target", "data_path"},
+	)
+	mirrorDirectoriesTotal = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "http_mirror_directories_total", 
+			Help: "Total number of mirrored directories",
+		},
+		[]string{"target", "data_path"},
+	)
+	mirrorSizeBytes = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "http_mirror_size_bytes",
+			Help: "Total size of mirrored data in bytes",
+		},
+		[]string{"target", "data_path"},
+	)
+)
+
 func main() {
+	// Register Prometheus metrics
+	prometheus.MustRegister(mirrorFilesTotal)
+	prometheus.MustRegister(mirrorDirectoriesTotal) 
+	prometheus.MustRegister(mirrorSizeBytes)
+
 	// Parse command line flags
 	configFile := flag.String("config", "", "Path to configuration file")
 	flag.Parse()
@@ -59,8 +91,14 @@ func main() {
 	// Health check endpoint
 	mux.HandleFunc("/health", healthCheckHandler)
 	
-	// Status endpoint
-	mux.HandleFunc("/status", statusHandler(cfg))
+	// Prometheus metrics endpoint
+	mux.Handle("/metrics", promhttp.Handler())
+
+	// Initialize metrics immediately
+	updateMetrics(cfg, logger)
+	
+	// Start metrics updater
+	go updateMetricsLoop(cfg, logger)
 
 	server := &http.Server{
 		Addr:    fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),
@@ -108,34 +146,68 @@ func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, `{"status":"healthy","service":"http-mirror-server"}`)
 }
 
-// statusHandler returns server status information
-func statusHandler(cfg *config.Config) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		
-		// Get basic statistics about the data directory
-		stats, err := getDirStats(cfg.Server.DataPath)
-		if err != nil {
-			stats = map[string]interface{}{"error": err.Error()}
+// updateMetricsLoop periodically updates Prometheus metrics
+func updateMetricsLoop(cfg *config.Config, logger *slog.Logger) {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			updateMetrics(cfg, logger)
 		}
-		
-		response := map[string]interface{}{
-			"status":    "running",
-			"service":   "http-mirror-server",
-			"data_path": cfg.Server.DataPath,
-			"stats":     stats,
-		}
-		
-		// Simple JSON encoding
-		fmt.Fprintf(w, `{
-			"status": "%s",
-			"service": "%s", 
-			"data_path": "%s",
-			"stats": %v
-		}`, response["status"], response["service"], response["data_path"], stats)
 	}
 }
+
+// updateMetrics calculates and updates Prometheus metrics
+func updateMetrics(cfg *config.Config, logger *slog.Logger) {
+	// Update global metrics for the entire data path
+	globalStats, err := getDirStats(cfg.Server.DataPath)
+	if err != nil {
+		logger.Warn("Failed to update global metrics", "error", err)
+	} else {
+		dataPath := cfg.Server.DataPath
+		
+		if files, ok := globalStats["files"].(int); ok {
+			mirrorFilesTotal.WithLabelValues("_global", dataPath).Set(float64(files))
+		}
+		
+		if dirs, ok := globalStats["directories"].(int); ok {
+			mirrorDirectoriesTotal.WithLabelValues("_global", dataPath).Set(float64(dirs))
+		}
+		
+		if size, ok := globalStats["total_size_bytes"].(int64); ok {
+			mirrorSizeBytes.WithLabelValues("_global", dataPath).Set(float64(size))
+		}
+	}
+
+	// Update per-target metrics
+	for _, target := range cfg.Targets {
+		targetPath := filepath.Join(cfg.Server.DataPath, target.Name)
+		targetStats, err := getDirStats(targetPath)
+		if err != nil {
+			logger.Warn("Failed to update target metrics", "target", target.Name, "error", err)
+			// Set zero values for missing targets
+			mirrorFilesTotal.WithLabelValues(target.Name, targetPath).Set(0)
+			mirrorDirectoriesTotal.WithLabelValues(target.Name, targetPath).Set(0)
+			mirrorSizeBytes.WithLabelValues(target.Name, targetPath).Set(0)
+			continue
+		}
+		
+		if files, ok := targetStats["files"].(int); ok {
+			mirrorFilesTotal.WithLabelValues(target.Name, targetPath).Set(float64(files))
+		}
+		
+		if dirs, ok := targetStats["directories"].(int); ok {
+			mirrorDirectoriesTotal.WithLabelValues(target.Name, targetPath).Set(float64(dirs))
+		}
+		
+		if size, ok := targetStats["total_size_bytes"].(int64); ok {
+			mirrorSizeBytes.WithLabelValues(target.Name, targetPath).Set(float64(size))
+		}
+	}
+}
+
 
 // getDirStats returns basic statistics about a directory
 func getDirStats(dirPath string) (map[string]interface{}, error) {

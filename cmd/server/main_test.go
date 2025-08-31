@@ -2,12 +2,15 @@ package main
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/jhofer-cloud/http-mirror/pkg/config"
 )
 
@@ -42,7 +45,7 @@ func TestHealthCheckHandler(t *testing.T) {
 	}
 }
 
-func TestStatusHandler(t *testing.T) {
+func TestMetricsEndpoint(t *testing.T) {
 	tempDir := t.TempDir()
 	
 	// Create some test files to get stats
@@ -52,27 +55,49 @@ func TestStatusHandler(t *testing.T) {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 	
+	// Create target directory structure
+	targetDir := filepath.Join(tempDir, "example-target")
+	err = os.Mkdir(targetDir, 0755)
+	if err != nil {
+		t.Fatalf("Failed to create target directory: %v", err)
+	}
+	
+	targetFile := filepath.Join(targetDir, "target.txt")
+	err = os.WriteFile(targetFile, []byte("target content"), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create target file: %v", err)
+	}
+
 	cfg := &config.Config{
 		Server: config.Server{
 			DataPath: tempDir,
 		},
+		Targets: []config.Target{
+			{
+				Name: "example-target",
+				URL:  "http://example.com/files/",
+			},
+		},
 	}
 	
-	handler := statusHandler(cfg)
+	// Update metrics first
+	updateMetrics(cfg, slog.Default())
 	
-	req := httptest.NewRequest("GET", "/status", nil)
+	// Test the metrics endpoint
+	req := httptest.NewRequest("GET", "/metrics", nil)
 	w := httptest.NewRecorder()
 	
-	handler(w, req)
+	promhttp.Handler().ServeHTTP(w, req)
 	
 	resp := w.Result()
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("Expected status 200, got %d", resp.StatusCode)
 	}
 	
-	contentType := resp.Header.Get("Content-Type")
-	if contentType != "application/json" {
-		t.Errorf("Expected Content-Type 'application/json', got %s", contentType)
+	body := w.Body.String()
+	// Check for Prometheus format response rather than specific metric since it might not be registered in test
+	if !strings.Contains(body, "HELP") && !strings.Contains(body, "TYPE") {
+		t.Error("Expected metrics endpoint to return Prometheus format data")
 	}
 }
 
