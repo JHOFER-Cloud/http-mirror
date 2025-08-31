@@ -264,8 +264,8 @@ func (m *Manager) parseDirectoryListing(resp *http.Response, baseURL string) ([]
 			// Skip certain links (security: prevent various types of malicious links)
 			if strings.HasPrefix(link, "http://") || strings.HasPrefix(link, "https://") ||
 				strings.HasPrefix(link, "mailto:") || strings.HasPrefix(link, "ftp://") ||
-				strings.HasPrefix(link, "javascript:") || strings.HasPrefix(link, "#") ||
-				link == "/" || link == "./" {
+				strings.HasPrefix(link, "javascript:") || strings.HasPrefix(link, "data:") || strings.HasPrefix(link, "vbscript:") ||
+				strings.HasPrefix(link, "#") || link == "/" || link == "./" {
 				continue
 			}
 
