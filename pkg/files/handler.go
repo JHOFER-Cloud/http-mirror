@@ -103,19 +103,22 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// If it's a file, serve it
 	if !stat.IsDir() {
-		h.serveFile(w, r, filePath)
+		h.serveFile(w, r, cleanPath)
 		return
 	}
 
 	// If it's a directory, check for index.html first
-	indexPath := filepath.Join(filePath, "index.html")
-	if _, err := os.Stat(indexPath); err == nil {
-		h.serveFile(w, r, indexPath)
-		return
+	indexPath := filepath.Join(cleanPath, "index.html")
+	indexAbsPath, err := filepath.Abs(indexPath)
+	if err == nil && strings.HasPrefix(indexAbsPath, rootAbs) {
+		if _, err := os.Stat(indexAbsPath); err == nil {
+			h.serveFile(w, r, indexAbsPath)
+			return
+		}
 	}
 
 	// Generate directory listing
-	h.serveDirectory(w, r, filePath, urlPath)
+	h.serveDirectory(w, r, cleanPath, urlPath)
 }
 
 // serveFile serves a static file
