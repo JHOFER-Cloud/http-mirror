@@ -66,55 +66,7 @@ docker run -d -p 8080:8080 -v $(pwd)/data:/data -v $(pwd)/config.json:/config/co
 
 ## Configuration
 
-### Example Values File
-
-```yaml
-# Global defaults for all targets
-defaults:
-  userAgent: "Mozilla/5.0 (compatible; HttpMirror/1.0; Educational Purpose) Friendly Mirror/Archive"
-  rateLimit: "500k" # 500KB/s
-  maxDepth: 5
-  waitBetweenRequests: 1
-
-# Sites to mirror
-targets:
-  - name: "documentation"
-    url: "http://docs.example.com/files/"
-
-  - name: "releases"
-    url: "https://releases.site.com/downloads/"
-    rateLimit: "200k" # Slower for this site
-    maxDepth: 10
-
-# Schedule updates daily at 8AM Berlin time
-updater:
-  schedule:
-    cron: "0 8 * * *"
-    timezone: "Europe/Berlin"
-
-# Web server with multiple replicas
-server:
-  replicaCount: 2
-
-# Storage for mirrored files
-storage:
-  size: "100Gi"
-  storageClassName: "fast-ssd"
-
-# Public access
-ingress:
-  enabled: true
-  className: "nginx"
-  hosts:
-    - host: "mirror.example.com"
-      paths:
-        - path: "/"
-          pathType: Prefix
-  tls:
-    - secretName: mirror-tls
-      hosts:
-        - mirror.example.com
-```
+See: <https://github.com/JHOFER-Cloud/helm-charts/tree/main/charts/http-mirror>
 
 ## Development
 
