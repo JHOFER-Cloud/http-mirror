@@ -91,7 +91,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check if file/directory exists
-	stat, err := os.Stat(filePath)
+	stat, err := os.Stat(cleanPath)
 	if os.IsNotExist(err) {
 		http.Error(w, "File not found", http.StatusNotFound)
 		return
