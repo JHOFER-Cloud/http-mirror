@@ -1,0 +1,41 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# CI/CD
+.github
+
+# Documentation
+README.md
+LICENSE
+docs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+/bin/
+/dist/
+/build/
+
+# Test files
+*_test.go
+/testdata/
+
+# Docker
+Dockerfile*
+.dockerignore
+
+# Development
+/tmp/
+/data/
+*.log

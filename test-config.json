@@ -1,0 +1,22 @@
+{
+  "mirror": {
+    "dataPath": "./test-data"
+  },
+  "server": {
+    "dataPath": "./test-data",
+    "port": 3000
+  },
+  "targets": [
+    {
+      "name": "test-server",
+      "url": "http://localhost:8080/",
+      "userAgent": "HTTP Mirror Test/1.0",
+      "maxDepth": -1,
+      "timeout": 10,
+      "checkChanges": true,
+      "waitBetweenRequests": 0,
+      "rateLimit": "1m"
+    }
+  ]
+}
+
