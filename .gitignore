@@ -44,3 +44,6 @@ config.json
 .direnv
 coverage.html
 test-data
+.devenv
+.devenv.flake.nix
+.pre-commit-config.yaml

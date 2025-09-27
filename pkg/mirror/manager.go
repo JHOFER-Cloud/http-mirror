@@ -119,7 +119,7 @@ func (m *Manager) mirrorURL(ctx context.Context, client *httpPkg.Client, target 
 	// Check if this looks like a directory listing
 	contentType := resp.Header.Get("Content-Type")
 	m.logger.Debug("Fetched URL", "url", currentURL, "contentType", contentType)
-	
+
 	if strings.Contains(contentType, "text/html") {
 		// Parse HTML to find links
 		links, err := m.parseDirectoryListing(resp, currentURL)
@@ -351,4 +351,3 @@ func (m *Manager) downloadFile(ctx context.Context, client *httpPkg.Client, url,
 
 	return nil
 }
-

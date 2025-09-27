@@ -55,7 +55,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	logger.Info("Configuration loaded", 
+	logger.Info("Configuration loaded",
 		"targets", len(cfg.Targets),
 		"data_path", cfg.Mirror.DataPath)
 
@@ -69,7 +69,7 @@ func main() {
 	// Mirror all targets
 	var errors []error
 	for i, target := range cfg.Targets {
-		logger.Info("Starting mirror for target", 
+		logger.Info("Starting mirror for target",
 			"index", i+1,
 			"total", len(cfg.Targets),
 			"name", target.Name,
@@ -80,15 +80,15 @@ func main() {
 		duration := time.Since(startTime)
 
 		if err != nil {
-			logger.Error("Failed to mirror target", 
-				"name", target.Name, 
+			logger.Error("Failed to mirror target",
+				"name", target.Name,
 				"url", target.URL,
 				"duration", duration,
 				"error", err)
 			errors = append(errors, fmt.Errorf("target %s: %w", target.Name, err))
 		} else {
-			logger.Info("Successfully mirrored target", 
-				"name", target.Name, 
+			logger.Info("Successfully mirrored target",
+				"name", target.Name,
 				"url", target.URL,
 				"duration", duration)
 		}
@@ -96,19 +96,19 @@ func main() {
 
 	// Final summary
 	if len(errors) > 0 {
-		logger.Error("Mirror process completed with errors", 
+		logger.Error("Mirror process completed with errors",
 			"successful", len(cfg.Targets)-len(errors),
 			"failed", len(errors),
 			"total", len(cfg.Targets))
-		
+
 		for _, err := range errors {
 			logger.Error("Error details", "error", err)
 		}
-		
+
 		// Exit with error code if any mirrors failed
 		os.Exit(1)
 	} else {
-		logger.Info("Mirror process completed successfully", 
+		logger.Info("Mirror process completed successfully",
 			"targets", len(cfg.Targets))
 	}
 }

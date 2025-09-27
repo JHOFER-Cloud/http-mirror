@@ -12,10 +12,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/jhofer-cloud/http-mirror/pkg/config"
 	"github.com/jhofer-cloud/http-mirror/pkg/files"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 var (
@@ -29,7 +29,7 @@ var (
 	)
 	mirrorDirectoriesTotal = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "http_mirror_directories_total", 
+			Name: "http_mirror_directories_total",
 			Help: "Total number of mirrored directories",
 		},
 		[]string{"target", "data_path"},
@@ -46,7 +46,7 @@ var (
 func main() {
 	// Register Prometheus metrics
 	prometheus.MustRegister(mirrorFilesTotal)
-	prometheus.MustRegister(mirrorDirectoriesTotal) 
+	prometheus.MustRegister(mirrorDirectoriesTotal)
 	prometheus.MustRegister(mirrorSizeBytes)
 
 	// Parse command line flags
@@ -71,7 +71,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	logger.Info("Starting HTTP Mirror Server", 
+	logger.Info("Starting HTTP Mirror Server",
 		"port", cfg.Server.Port,
 		"data_path", cfg.Server.DataPath)
 
@@ -84,13 +84,13 @@ func main() {
 
 	// Create HTTP server
 	mux := http.NewServeMux()
-	
+
 	// File serving handler
 	mux.Handle("/", fileHandler)
-	
+
 	// Health check endpoint
 	mux.HandleFunc("/health", healthCheckHandler)
-	
+
 	// Prometheus metrics endpoint
 	mux.Handle("/metrics", promhttp.Handler())
 
@@ -99,14 +99,14 @@ func main() {
 
 	// Initialize metrics immediately
 	updateMetrics(cfg, logger)
-	
+
 	// Start metrics updater
 	go updateMetricsLoop(cfg, logger)
 
 	server := &http.Server{
 		Addr:    fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),
 		Handler: handler,
-		
+
 		// Security settings
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      10 * time.Second,
@@ -170,15 +170,15 @@ func updateMetrics(cfg *config.Config, logger *slog.Logger) {
 		logger.Warn("Failed to update global metrics", "error", err)
 	} else {
 		dataPath := cfg.Server.DataPath
-		
+
 		if files, ok := globalStats["files"].(int); ok {
 			mirrorFilesTotal.WithLabelValues("_global", dataPath).Set(float64(files))
 		}
-		
+
 		if dirs, ok := globalStats["directories"].(int); ok {
 			mirrorDirectoriesTotal.WithLabelValues("_global", dataPath).Set(float64(dirs))
 		}
-		
+
 		if size, ok := globalStats["total_size_bytes"].(int64); ok {
 			mirrorSizeBytes.WithLabelValues("_global", dataPath).Set(float64(size))
 		}
@@ -196,59 +196,58 @@ func updateMetrics(cfg *config.Config, logger *slog.Logger) {
 			mirrorSizeBytes.WithLabelValues(target.Name, targetPath).Set(0)
 			continue
 		}
-		
+
 		if files, ok := targetStats["files"].(int); ok {
 			mirrorFilesTotal.WithLabelValues(target.Name, targetPath).Set(float64(files))
 		}
-		
+
 		if dirs, ok := targetStats["directories"].(int); ok {
 			mirrorDirectoriesTotal.WithLabelValues(target.Name, targetPath).Set(float64(dirs))
 		}
-		
+
 		if size, ok := targetStats["total_size_bytes"].(int64); ok {
 			mirrorSizeBytes.WithLabelValues(target.Name, targetPath).Set(float64(size))
 		}
 	}
 }
 
-
 // getDirStats returns basic statistics about a directory
 func getDirStats(dirPath string) (map[string]interface{}, error) {
 	stats := make(map[string]interface{})
-	
+
 	// Check if directory exists
 	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
 		return stats, fmt.Errorf("directory does not exist: %s", dirPath)
 	}
-	
+
 	// Count files and directories
 	fileCount := 0
 	dirCount := 0
 	var totalSize int64
-	
+
 	err := filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		
+
 		if info.IsDir() {
 			dirCount++
 		} else {
 			fileCount++
 			totalSize += info.Size()
 		}
-		
+
 		return nil
 	})
-	
+
 	if err != nil {
 		return stats, err
 	}
-	
+
 	stats["files"] = fileCount
 	stats["directories"] = dirCount
 	stats["total_size_bytes"] = totalSize
-	
+
 	return stats, nil
 }
 
@@ -257,17 +256,17 @@ func securityHeadersMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Content Security Policy
 		w.Header().Set("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; object-src 'none';")
-		
+
 		// X-Frame-Options to prevent clickjacking
 		w.Header().Set("X-Frame-Options", "DENY")
-		
+
 		// X-Content-Type-Options to prevent MIME type sniffing
 		w.Header().Set("X-Content-Type-Options", "nosniff")
-		
+
 		// Other security headers
 		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		w.Header().Set("X-XSS-Protection", "1; mode=block")
-		
+
 		next.ServeHTTP(w, r)
 	})
 }

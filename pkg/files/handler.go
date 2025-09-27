@@ -468,4 +468,3 @@ const directoryTemplate = `<!DOCTYPE html>
     </div>
 </body>
 </html>`
-
