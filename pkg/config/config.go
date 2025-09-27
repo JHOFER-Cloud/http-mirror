@@ -10,18 +10,18 @@ import (
 
 // Target represents a single mirror target
 type Target struct {
-	Name                  string `json:"name"`
-	URL                   string `json:"url"`
-	UserAgent             string `json:"userAgent,omitempty"`
-	RateLimit             string `json:"rateLimit,omitempty"`
-	Retries               int    `json:"retries,omitempty"`
-	MaxDepth              int    `json:"maxDepth,omitempty"`
-	Timeout               int    `json:"timeout,omitempty"`
-	WaitBetweenRequests   int    `json:"waitBetweenRequests,omitempty"`
-	Timestamping          bool   `json:"timestamping,omitempty"`
-	NoClobber             bool   `json:"noClobber,omitempty"`
-	ContinueDownload      bool   `json:"continueDownload,omitempty"`
-	CheckChanges          bool   `json:"checkChanges,omitempty"`
+	Name                string `json:"name"`
+	URL                 string `json:"url"`
+	UserAgent           string `json:"userAgent,omitempty"`
+	RateLimit           string `json:"rateLimit,omitempty"`
+	Retries             int    `json:"retries,omitempty"`
+	MaxDepth            int    `json:"maxDepth,omitempty"`
+	Timeout             int    `json:"timeout,omitempty"`
+	WaitBetweenRequests int    `json:"waitBetweenRequests,omitempty"`
+	Timestamping        bool   `json:"timestamping,omitempty"`
+	NoClobber           bool   `json:"noClobber,omitempty"`
+	ContinueDownload    bool   `json:"continueDownload,omitempty"`
+	CheckChanges        bool   `json:"checkChanges,omitempty"`
 }
 
 // Config represents the complete mirror configuration
@@ -54,8 +54,8 @@ type Mirror struct {
 
 // Server contains web server configuration
 type Server struct {
-	Port    int    `json:"port"`
-	Host    string `json:"host"`
+	Port     int    `json:"port"`
+	Host     string `json:"host"`
 	DataPath string `json:"dataPath"`
 }
 

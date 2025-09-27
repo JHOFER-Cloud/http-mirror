@@ -11,7 +11,7 @@ func main() {
 	// Create a simple file server that mimics Apache/Nginx directory listings
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("%s %s", r.Method, r.URL.Path)
-		
+
 		switch r.URL.Path {
 		case "/":
 			// Serve directory listing

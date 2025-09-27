@@ -220,7 +220,7 @@ func (r *rateLimitedReader) Read(p []byte) (n int, err error) {
 	if err := r.limiter.WaitN(r.ctx, len(p)); err != nil {
 		return 0, err
 	}
-	
+
 	return r.reader.Read(p)
 }
 
@@ -231,10 +231,10 @@ func (r *rateLimitedReader) Close() error {
 // parseRateLimit parses a rate limit string like "500k" into bytes per second
 func parseRateLimit(rateStr string) int64 {
 	rateStr = strings.ToLower(strings.TrimSpace(rateStr))
-	
+
 	var multiplier int64 = 1
 	var numStr string
-	
+
 	if strings.HasSuffix(rateStr, "k") {
 		multiplier = 1024
 		numStr = strings.TrimSuffix(rateStr, "k")
@@ -247,10 +247,10 @@ func parseRateLimit(rateStr string) int64 {
 	} else {
 		numStr = rateStr
 	}
-	
+
 	if num, err := strconv.ParseInt(numStr, 10, 64); err == nil {
 		return num * multiplier
 	}
-	
+
 	return 0
 }
